@@ -1,0 +1,13 @@
+bin/
+*.age
+.env
+*.session
+vendor/
+
+# Test coverage
+coverage.out
+coverage.html
+*.coverprofile
+
+# OS
+.DS_Store
