@@ -42,7 +42,7 @@ jobs:
         run: |
           TAG=${GITHUB_REF_NAME}
           go build \
-            -ldflags="-s -w -X main.version=${TAG}" \
+            -ldflags="-s -w -X main.version=${TAG} -X main.goos=${{ matrix.GOOS }} -X main.goarch=${{ matrix.GOARCH }}" \
             -o radar-${{ matrix.GOOS }}-${{ matrix.GOARCH }} \
             ./cmd/radar
 
