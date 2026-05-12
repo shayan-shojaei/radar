@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-REPO="shayan/radar"
+REPO="shayan-shojaei/radar"
 INSTALL_DIR="/usr/local/bin"
 BINARY="radar"
 
