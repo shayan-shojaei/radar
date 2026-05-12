@@ -347,10 +347,36 @@ func (m *RequestModel) ApplySession(rd models.RequestData) {
 			}
 		}
 	}
-	// F2: restore body mode.
+	// Restore body mode and re-populate individual field inputs from saved JSON.
 	if rd.BodyMode == "fields" && len(m.endpoint.BodyFields) > 0 {
 		m.bodyMode = bodyModeFields
+		if rd.Body != "" {
+			var obj map[string]interface{}
+			if err := json.Unmarshal([]byte(rd.Body), &obj); err == nil {
+				specKeys := make(map[string]bool, len(m.bodyFieldInputs))
+				for i := range m.bodyFieldInputs {
+					key := m.bodyFieldInputs[i].paramKey
+					specKeys[key] = true
+					if v, ok := obj[key]; ok {
+						m.bodyFieldInputs[i].textInput.SetValue(fmt.Sprint(v))
+					}
+				}
+				extraIdx := 0
+				for k, v := range obj {
+					if !specKeys[k] && extraIdx+1 < len(m.extraBodyFields) {
+						m.extraBodyFields[extraIdx].textInput.SetValue(k)
+						m.extraBodyFields[extraIdx+1].textInput.SetValue(fmt.Sprint(v))
+						extraIdx += 2
+					}
+				}
+			}
+		}
 	}
+}
+
+// CurrentRequestData returns the current form state for auto-saving on navigate-away.
+func (m RequestModel) CurrentRequestData() models.RequestData {
+	return m.buildRequestData()
 }
 
 func (m RequestModel) buildRequestData() models.RequestData {

@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/shayan-shojaei/radar/internal/config"
 	"github.com/shayan-shojaei/radar/internal/openapi"
+	"github.com/shayan-shojaei/radar/internal/prefs"
 	"github.com/shayan-shojaei/radar/internal/requester"
 	"github.com/shayan-shojaei/radar/internal/session"
 	tuimsg "github.com/shayan-shojaei/radar/internal/tui/msg"
@@ -99,6 +100,7 @@ type Model struct {
 	authHeader     string
 	pendingCookies []models.ReceivedCookie
 	helpExpanded   bool
+	prefs          *prefs.Prefs
 }
 
 func New(endpoints []models.ParsedEndpoint, baseURL, specURL string, cfg *config.Config, passphrase string) Model {
@@ -118,6 +120,14 @@ func New(endpoints []models.ParsedEndpoint, baseURL, specURL string, cfg *config
 		authHeader = sess.AuthHeader
 	}
 
+	p, _ := prefs.Load(cfg.StorageDir)
+	if p == nil {
+		p = &prefs.Prefs{SummaryMode: 1, CollapsedTags: make(map[string][]string)}
+	}
+
+	listM := views.NewListModel(endpoints)
+	listM.ApplyPrefs(p.SummaryMode, p.CollapsedTags[specURL])
+
 	return Model{
 		cfg:           cfg,
 		endpoints:     endpoints,
@@ -125,12 +135,13 @@ func New(endpoints []models.ParsedEndpoint, baseURL, specURL string, cfg *config
 		specURL:       specURL,
 		passphrase:    passphrase,
 		state:         viewList,
-		listModel:     views.NewListModel(endpoints),
+		listModel:     listM,
 		responseModel: views.EmptyResponseModel(),
 		req:           requester.New(timeout),
 		spinner:       sp,
 		cookieJar:     cookieJar,
 		authHeader:    authHeader,
+		prefs:         p,
 	}
 }
 
@@ -178,6 +189,11 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tuimsg.EndpointSelectedMsg:
+		// Auto-save the previous endpoint's state before switching.
+		var saveCmd tea.Cmd
+		if m.state == viewRequest {
+			m, saveCmd = m.autoSaveCurrentRequest()
+		}
 		m.requestModel = views.NewRequestModel(message.Endpoint, m.baseURL)
 		m.requestModel.Resize(m.layout.reqInnerW, m.layout.reqInnerH)
 		m.responseModel = views.EmptyResponseModel()
@@ -191,7 +207,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		return m, m.requestModel.Init()
+		return m, tea.Batch(saveCmd, m.requestModel.Init())
 
 	case tuimsg.SessionLoadRequestMsg:
 		if m.state == viewRequest && m.baseURL != "" {
@@ -256,6 +272,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.baseURL = message.BaseURL
 		}
 		m.listModel = views.NewListModel(message.Endpoints)
+		m.listModel.ApplyPrefs(m.prefs.SummaryMode, m.prefs.CollapsedTags[m.specURL])
 		m.listModel.Resize(m.layout.listInnerW, m.layout.listInnerH)
 		// If an endpoint was open, check whether it still exists.
 		if prevEp != nil && (m.state == viewRequest || m.state == viewResponse) {
@@ -285,8 +302,12 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = viewRequest
 			return m, m.requestModel.Init()
 		default:
+			var saveCmd tea.Cmd
+			if m.state == viewRequest {
+				m, saveCmd = m.autoSaveCurrentRequest()
+			}
 			m.state = viewList
-			return m, m.listModel.Init()
+			return m, tea.Batch(saveCmd, m.listModel.Init())
 		}
 
 	case spinner.TickMsg:
@@ -311,6 +332,10 @@ func (m Model) delegateKey(km tea.KeyMsg) (Model, tea.Cmd) {
 			return m, m.cookieManager.Init()
 		}
 		m.listModel, cmd = m.listModel.Update(km)
+		switch km.String() {
+		case "d", "z", " ", "C", "E", "enter":
+			cmd = tea.Batch(cmd, m.savePrefsCmd())
+		}
 	case viewRequest:
 		m.requestModel, cmd = m.requestModel.Update(km)
 	case viewResponse:
@@ -659,6 +684,41 @@ func (m Model) saveRequestCmd(methodPath string, rd models.RequestData) tea.Cmd 
 		}
 		sess.AuthHeader = authHeader
 		session.Save(sess, storageDir, passphrase) //nolint:errcheck
+		return nil
+	}
+}
+
+// autoSaveCurrentRequest saves the request editor's current state to the session
+// file without requiring the user to send the request. Used on navigate-away.
+func (m Model) autoSaveCurrentRequest() (Model, tea.Cmd) {
+	ep := m.requestModel.Endpoint()
+	if ep == nil {
+		return m, nil
+	}
+	rd := m.requestModel.CurrentRequestData()
+	baseURL, methodPath := splitEndpointKey(rd.EndpointKey)
+	if baseURL == "" {
+		return m, nil
+	}
+	m.baseURL = baseURL
+	return m, m.saveRequestCmd(methodPath, rd)
+}
+
+func (m Model) savePrefsCmd() tea.Cmd {
+	p := &prefs.Prefs{
+		SummaryMode:   m.listModel.GetSummaryMode(),
+		CollapsedTags: make(map[string][]string, len(m.prefs.CollapsedTags)+1),
+	}
+	for k, v := range m.prefs.CollapsedTags {
+		p.CollapsedTags[k] = v
+	}
+	p.CollapsedTags[m.specURL] = m.listModel.GetCollapsedTagNames()
+	// Update in-memory prefs so subsequent saves don't overwrite the latest state.
+	m.prefs.SummaryMode = p.SummaryMode
+	m.prefs.CollapsedTags = p.CollapsedTags
+	storageDir := m.cfg.StorageDir
+	return func() tea.Msg {
+		prefs.Save(p, storageDir) //nolint:errcheck
 		return nil
 	}
 }

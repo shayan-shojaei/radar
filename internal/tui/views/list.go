@@ -95,6 +95,37 @@ func NewListModel(endpoints []models.ParsedEndpoint) ListModel {
 	return m
 }
 
+// ApplyPrefs restores summary mode and collapsed tag state from saved preferences.
+func (m *ListModel) ApplyPrefs(summaryModeN int, collapsedTags []string) {
+	if summaryModeN >= 0 && summaryModeN <= 2 {
+		m.summary = summaryMode(summaryModeN)
+	}
+	collSet := make(map[string]bool, len(collapsedTags))
+	for _, t := range collapsedTags {
+		collSet[t] = true
+	}
+	for i := range m.groups {
+		m.groups[i].collapsed = collSet[m.groups[i].name]
+	}
+	m.buildRows()
+}
+
+// GetSummaryMode returns the current summary mode as an int for serialization.
+func (m ListModel) GetSummaryMode() int {
+	return int(m.summary)
+}
+
+// GetCollapsedTagNames returns the names of all currently collapsed tag groups.
+func (m ListModel) GetCollapsedTagNames() []string {
+	var names []string
+	for _, g := range m.groups {
+		if g.collapsed {
+			names = append(names, g.name)
+		}
+	}
+	return names
+}
+
 // Resize is called by the app when the inner panel dimensions change.
 func (m *ListModel) Resize(innerW, innerH int) {
 	m.width = innerW
