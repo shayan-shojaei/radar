@@ -1,18 +1,24 @@
 # radar
 
-An interactive terminal API explorer for OpenAPI / Swagger specifications.
+**A terminal API explorer for OpenAPI / Swagger specifications.**
 
-## What it does
+Browse endpoints, craft requests, and inspect responses — all without leaving your terminal.
 
-radar accepts an OpenAPI 3.x or Swagger 2.0 spec URL (or local file) and launches
-a TUI where you can:
+![Endpoint list and response viewer](assets/response.png)
 
-- Browse all available endpoints, filterable and grouped by tag
-- Select an endpoint and fill in path params, query params, headers, cookies, and body
-- Send HTTP requests and inspect the response (status, headers, pretty-printed JSON body)
-- Save and reload previous requests per endpoint — stored as encrypted files using [age](https://age-encryption.org/)
-- Manage a persistent cookie jar and global Authorization header per base URL
-- Save and quickly re-open frequently used spec URLs from a built-in picker
+---
+
+## Features
+
+- **Browse** all endpoints from any OpenAPI 3.x or Swagger 2.0 spec, grouped by tag with collapsible sections
+- **Filter** endpoints live as you type
+- **Edit** path params, query params, headers, cookies, and request body (raw JSON or structured fields)
+- **Send** requests and inspect status, headers, and pretty-printed JSON responses
+- **Save** — every request is auto-saved as an [age](https://age-encryption.org/)-encrypted session file and restored next time you open the same endpoint
+- **Cookie jar** — responses that set cookies are captured automatically; an optional global Authorization header is injected into every request
+- **Spec picker** — save frequently used spec URLs and reopen them in one keystroke
+
+---
 
 ## Installation
 
@@ -30,6 +36,8 @@ curl -fsSL https://raw.githubusercontent.com/shayan-shojaei/radar/main/install.s
 go install github.com/shayan-shojaei/radar@latest
 ```
 
+---
+
 ## Quick start
 
 ```sh
@@ -46,7 +54,29 @@ radar ./openapi.yaml
 radar
 ```
 
-When launched without a URL, radar shows a picker of previously saved specs. Press `a` to add a new one.
+---
+
+## Screenshots
+
+### Saved spec picker
+
+Launch `radar` with no arguments to open your saved specs.
+
+![Spec picker](assets/spec-picker.png)
+
+### Endpoint list
+
+All endpoints grouped by tag. Use `/` to filter, `↑↓` to navigate, `Enter` to select.
+
+![Endpoint list](assets/endpoint-list.png)
+
+### Request editor + response viewer
+
+Fill in params and body, hit `Ctrl+S` to send, and inspect the response inline.
+
+![Request and response](assets/response.png)
+
+---
 
 ## Key bindings
 
@@ -94,26 +124,26 @@ When launched without a URL, radar shows a picker of previously saved specs. Pre
 | `E / Enter` | Edit the Authorization header |
 | `Esc` | Save changes and return to list |
 
+---
+
 ## Session & encryption
 
-When you send a request, radar auto-saves the request data (headers, body, cookies,
-params) to `~/.config/radar/sessions/<hostname>.age`. These files are encrypted with
-[age](https://age-encryption.org/) using a passphrase.
+When you send a request, radar auto-saves the request data (headers, body, cookies, params) to `~/.config/radar/sessions/<hostname>.age`. These files are encrypted with [age](https://age-encryption.org/) using a passphrase.
 
 Set `RADAR_PASSPHRASE` in your environment to skip the interactive prompt.
 
-The next time you open the same endpoint, the saved fields are restored automatically.
-Press `Ctrl+L` to force-reload from the session file.
+The next time you open the same endpoint, the saved fields are restored automatically. Press `Ctrl+L` to force-reload from the session file.
+
+---
 
 ## Cookie jar
 
-- Non-HttpOnly cookies returned in `Set-Cookie` headers are **silently added** to
-  the cookie jar and sent automatically on subsequent requests to the same host.
-- **HttpOnly cookies** trigger an interactive prompt — press `y` to persist or `n`
-  to discard.
+- Non-HttpOnly cookies returned in `Set-Cookie` headers are **silently added** to the cookie jar and sent automatically on subsequent requests to the same host.
+- **HttpOnly cookies** trigger an interactive prompt — press `y` to persist or `n` to discard.
 - The cookie jar is shown (and editable) via `K` from the endpoint list.
-- An optional global **Authorization** header can be set in the cookie manager; it is
-  injected automatically into every request that does not already have one.
+- An optional global **Authorization** header can be set in the cookie manager; it is injected automatically into every request that does not already have one.
+
+---
 
 ## Spec management
 
@@ -126,6 +156,8 @@ Saved specs are stored as plain JSON in `~/.config/radar/specs.json`.
 | Delete a spec | `radar` → navigate to it → `d` |
 | Open directly | `radar --url <url>` (bypasses picker) |
 
+---
+
 ## Configuration
 
 | Variable | Default | Description |
@@ -133,6 +165,8 @@ Saved specs are stored as plain JSON in `~/.config/radar/specs.json`.
 | `RADAR_STORAGE_DIR` | `~/.config/radar` | Directory for session files and specs list |
 | `RADAR_TIMEOUT` | `30` | HTTP request timeout (seconds) |
 | `RADAR_PASSPHRASE` | *(prompt)* | Session encryption passphrase |
+
+---
 
 ## Contributing
 
