@@ -2,6 +2,9 @@ package views
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -54,6 +57,41 @@ func (m *ResponseModel) Resize(innerW, innerH int) {
 // HasResponse reports whether a response has been received.
 func (m ResponseModel) HasResponse() bool { return m.hasResponse }
 
+// isHTML reports whether the response content-type is text/html.
+func (m ResponseModel) isHTML() bool {
+	ct := m.response.Headers["Content-Type"]
+	if ct == "" {
+		ct = m.response.Headers["content-type"]
+	}
+	return strings.Contains(strings.ToLower(ct), "text/html")
+}
+
+// openInBrowserCmd writes the HTML body to a temp file and opens it in the default browser.
+func openInBrowserCmd(body string) tea.Cmd {
+	return func() tea.Msg {
+		f, err := os.CreateTemp("", "radar-*.html")
+		if err != nil {
+			return nil
+		}
+		if _, err := f.WriteString(body); err != nil {
+			f.Close()
+			return nil
+		}
+		f.Close()
+		var cmd *exec.Cmd
+		switch runtime.GOOS {
+		case "darwin":
+			cmd = exec.Command("open", f.Name())
+		case "windows":
+			cmd = exec.Command("cmd", "/c", "start", f.Name())
+		default:
+			cmd = exec.Command("xdg-open", f.Name())
+		}
+		cmd.Start() //nolint:errcheck
+		return nil
+	}
+}
+
 // StatusTitle returns a compact title suffix for the panel border
 // (e.g. "200 OK  142ms").
 func (m ResponseModel) StatusTitle() string {
@@ -83,6 +121,11 @@ func (m ResponseModel) bodyContent() string {
 	sb.WriteString(styles.SectionDivider("BODY", m.width))
 	sb.WriteByte('\n')
 	sb.WriteString(styles.ColorizeJSON(m.response.Body))
+	if m.isHTML() {
+		sb.WriteByte('\n')
+		sb.WriteString(styles.Dim.Render("  ctrl+o: open in browser"))
+		sb.WriteByte('\n')
+	}
 	return sb.String()
 }
 
@@ -102,6 +145,10 @@ func (m ResponseModel) Update(message tea.Msg) (ResponseModel, tea.Cmd) {
 				m.vp.SetContent(m.bodyContent())
 			}
 			return m, nil
+		case "ctrl+o":
+			if m.hasResponse && m.isHTML() {
+				return m, openInBrowserCmd(m.response.Body)
+			}
 		}
 	}
 	var cmd tea.Cmd
