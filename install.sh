@@ -31,8 +31,8 @@ fi
 URL="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY}-${OS}-${ARCH}"
 
 echo "Installing radar ${VERSION} (${OS}/${ARCH})..."
-TMP=$(mktemp)
-curl -fsSL "$URL" -o "$TMP"
+TMP=$(mktemp /tmp/radar-XXXXXX)
+curl -fSL --retry 3 --retry-delay 2 --progress-bar "$URL" -o "$TMP"
 chmod +x "$TMP"
 sudo mv "$TMP" "${INSTALL_DIR}/${BINARY}"
 echo "radar ${VERSION} installed to ${INSTALL_DIR}/${BINARY}"
