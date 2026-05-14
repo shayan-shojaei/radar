@@ -122,7 +122,12 @@ func New(endpoints []models.ParsedEndpoint, baseURL, specURL string, cfg *config
 
 	p, _ := prefs.Load(cfg.StorageDir)
 	if p == nil {
-		p = &prefs.Prefs{SummaryMode: 1, CollapsedTags: make(map[string][]string)}
+		p = &prefs.Prefs{SummaryMode: 1, CollapsedTags: make(map[string][]string), LastBaseURLs: make(map[string]string)}
+	}
+
+	// Use the last base URL the user typed for this spec (overrides spec-defined server URL).
+	if last, ok := p.LastBaseURLs[specURL]; ok && last != "" {
+		baseURL = last
 	}
 
 	listM := views.NewListModel(endpoints)
@@ -663,6 +668,7 @@ func (m Model) doRequest(rd models.RequestData) tea.Cmd {
 
 func (m Model) saveRequestCmd(methodPath string, rd models.RequestData) tea.Cmd {
 	baseURL := m.baseURL
+	specURL := m.specURL
 	storageDir := m.cfg.StorageDir
 	passphrase := m.passphrase
 	jar := m.cookieJar
@@ -684,6 +690,16 @@ func (m Model) saveRequestCmd(methodPath string, rd models.RequestData) tea.Cmd 
 		}
 		sess.AuthHeader = authHeader
 		session.Save(sess, storageDir, passphrase) //nolint:errcheck
+		// Persist the last-used base URL for this spec so it survives restarts.
+		if specURL != "" && baseURL != "" {
+			if p, _ := prefs.Load(storageDir); p != nil {
+				if p.LastBaseURLs == nil {
+					p.LastBaseURLs = make(map[string]string)
+				}
+				p.LastBaseURLs[specURL] = baseURL
+				prefs.Save(p, storageDir) //nolint:errcheck
+			}
+		}
 		return nil
 	}
 }

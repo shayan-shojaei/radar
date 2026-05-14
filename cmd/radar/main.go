@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -68,6 +69,12 @@ and inspect responses. Session data is saved locally using age encryption.`,
 			}
 			if len(endpoints) == 0 {
 				return fmt.Errorf("no endpoints found in spec")
+			}
+			// Fall back to the spec URL's origin when the spec defines no servers.
+			if baseURL == "" {
+				if u, err := url.Parse(specURL); err == nil && u.Host != "" {
+					baseURL = u.Scheme + "://" + u.Host
+				}
 			}
 			fmt.Fprintf(os.Stderr, "Loaded %d endpoints\n", len(endpoints))
 

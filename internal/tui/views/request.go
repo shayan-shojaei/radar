@@ -66,6 +66,7 @@ type RequestModel struct {
 	width           int
 	height          int
 	ready           bool
+	statusErr       string // inline validation error shown above fields
 }
 
 // NewRequestModel creates a RequestModel for the given endpoint.
@@ -320,9 +321,9 @@ func (m *RequestModel) ApplySession(rd models.RequestData) {
 		case "__baseURL":
 			if idx := strings.Index(rd.EndpointKey, "|"); idx >= 0 {
 				f.textInput.SetValue(rd.EndpointKey[:idx])
-			} else {
-				f.textInput.SetValue(rd.EndpointKey)
 			}
+			// No | → EndpointKey is method+path only (stripped before saving via Ctrl+S).
+			// Leave the field as pre-filled by NewRequestModel from m.baseURL.
 		case "__body":
 			f.textarea.SetValue(rd.Body)
 		default:
@@ -493,8 +494,13 @@ func (m RequestModel) renderFields() string {
 		w = 60
 	}
 
-	fields := m.activeFields()
 	var sb strings.Builder
+	if m.statusErr != "" {
+		sb.WriteString(styles.ErrorTitle.Render("  ✗ " + m.statusErr))
+		sb.WriteByte('\n')
+	}
+
+	fields := m.activeFields()
 	var lastSection string
 
 	for i, f := range fields {
@@ -603,6 +609,21 @@ func (m RequestModel) Update(message tea.Msg) (RequestModel, tea.Cmd) {
 		case "esc":
 			return m, func() tea.Msg { return tuimsg.BackMsg{} }
 		case "ctrl+s":
+			baseURL := ""
+			for _, f := range m.fields {
+				if f.paramKey == "__baseURL" {
+					baseURL = strings.TrimSpace(f.textInput.Value())
+					break
+				}
+			}
+			if baseURL == "" {
+				m.statusErr = "Base URL is required"
+				if m.ready {
+					m.vp.SetContent(m.renderFields())
+				}
+				return m, nil
+			}
+			m.statusErr = ""
 			rd := m.buildRequestData()
 			return m, func() tea.Msg { return tuimsg.RequestSentMsg{Request: rd} }
 		case "tab", "down":

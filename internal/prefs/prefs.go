@@ -11,6 +11,7 @@ import (
 type Prefs struct {
 	SummaryMode   int                 `json:"summary_mode"`
 	CollapsedTags map[string][]string `json:"collapsed_tags"` // spec URL → collapsed tag names
+	LastBaseURLs  map[string]string   `json:"last_base_urls"` // spec URL → last used base URL
 }
 
 func filePath(storageDir string) string {
@@ -22,6 +23,7 @@ func Load(storageDir string) (*Prefs, error) {
 	p := &Prefs{
 		SummaryMode:   1,
 		CollapsedTags: make(map[string][]string),
+		LastBaseURLs:  make(map[string]string),
 	}
 	data, err := os.ReadFile(filePath(storageDir))
 	if os.IsNotExist(err) {
@@ -35,6 +37,9 @@ func Load(storageDir string) (*Prefs, error) {
 	}
 	if p.CollapsedTags == nil {
 		p.CollapsedTags = make(map[string][]string)
+	}
+	if p.LastBaseURLs == nil {
+		p.LastBaseURLs = make(map[string]string)
 	}
 	return p, nil
 }
